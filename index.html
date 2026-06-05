@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>【KGHS 學校福利社】瘋狂收銀大挑戰</title>
+    <style>
+        /* --- CSS 樣式：融合復古像素學校風與現代感介面 --- */
+        
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #2b1d12; /* 深木頭色背景，襯托遊戲畫面 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Segoe UI', Microsoft JhengHei, monospace;
+        }
+
+        #game-wrapper {
+            position: relative;
+        }
+
+        #game-container {
+            width: 1000px;
+            height: 666px; /* 根據原圖 3:2 黃金比例縮放 */
+            border: 6px solid #4a3525;
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+            /* 載入使用者指定的福利社背景圖片 */
+            background-image: url('Copilot_20260605_092724.png');
+            background-size: 100% 100%;
+            background-position: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+        }
+
+        /* 頂部資訊列：木質像素風 */
+        #top-info-bar {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            height: 50px;
+            background: rgba(43, 29, 18, 0.85);
+            border: 3px solid #fcd34d;
+            border-radius: 6px;
+            color: #fff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 25px;
+            font-size: 18px;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            z-index: 100;
+        }
+
+        .info-segment {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .highlight-text {
+            color: #fcd34d;
+            font-family: 'Courier New', monospace;
+            font-size: 24px;
+            text-shadow: 0 0 5px rgba(252, 211, 77, 0.5);
+        }
+
+        /* 區域標示（開發/除錯用，或讓玩家感知空間，此處調整為透明感） */
+        .shop-zone {
+            position: absolute;
+            /* border: 2px dashed rgba(255,255,255,0.2); */ /* 測試時可開啟看位置 */
+            pointer-events: none;
+        }
+        #zone-cooler { width: 250px; height: 350px; top: 100px; left: 10px; }
+        #zone-shelf { width: 250px; height: 250px; top: 220px; left: 250px; }
+
+        /* 學生角色樣式 */
+        .student {
+            width: 55px;
+            height: 55px;
+            border-radius: 50%;
+            border: 3px solid #1a1a1a;
+            position: absolute;
+            transition: left 0.8s ease-in-out, top 0.8s ease-in-out;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 32px;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+            z-index: 10;
+        }
+
+        /* 學生頭頂提示氣泡 */
+        .status-bubble {
+            position: absolute;
+            top: -45px;
+            background: white;
+            color: black;
+            font-size: 12px;
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 12px;
+            border: 2px solid #000;
+            white-space: nowrap;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+        .status-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 6px 6px 0;
+            border-style: solid;
+            border-color: white transparent;
+            display: block;
+            width: 0;
+        }
+
+        /* 學生情緒：暴躁狀態晃動 */
+        .angry-student {
+            border-color: #dc2626 !important;
+            animation: sub-shake 0.2s infinite alternate;
+        }
+
+        @keyframes sub-shake {
+            0% { transform: translate(2px, 1px) rotate(0deg); }
+            100% { transform: translate(-2px, -1px) rotate(2deg); }
+        }
+
+        /* 右側結帳核心 UI（對齊圖片收銀機上方偏右位置） */
+        #checkout-display-panel {
+            position: absolute;
+            top: 360px;
+            left: 590px;
+            width: 190px;
+            background: rgba(26, 26, 26, 0.9);
+            border: 3px solid #4ade80;
+            border-radius: 6px;
+            padding: 8px;
+            color: #4ade80;
+            font-family: 'Courier New', monospace;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            z-index: 90;
+            display: none; /* 有人排隊時才顯示 */
+        }
+
+        .panel-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            border-bottom: 1px solid #4ade80;
+            padding-bottom: 3px;
+            margin-bottom: 5px;
+            color: #86efac;
+        }
+
+        #scan-queue-icons {
+            display: flex;
+            gap: 6px;
+            font-size: 26px;
+            justify-content: center;
+            min-height: 35px;
+            align-items: center;
+        }
+
+        /* 結帳操作按鈕區：擺放在畫面最下方，做成實體大型復古按鈕 */
+        #control-board {
+            position: absolute;
+            bottom: 15px;
+            right: 20px;
+            background: rgba(50, 38, 29, 0.95);
+            border: 4px solid #855838;
+            border-radius: 8px;
+            padding: 12px 20px;
+            display: flex;
+            gap: 15px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+            z-index: 110;
+        }
+
+        .barcode-btn {
+            width: 75px;
+            height: 75px;
+            background: #fef3c7;
+            border: 4px solid #b45309;
+            border-radius: 10px;
+            font-size: 34px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            box-shadow: 0 6px 0 #b45309;
+            transition: all 0.05s ease;
+        }
+
+        .barcode-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #b45309;
+        }
+
+        .barcode-btn-label {
+            font-size: 11px;
+            color: #78350f;
+            font-weight: bold;
+            margin-top: 2px;
+        }
+
+        /* 震動效果（錯品扣時用） */
+        .screen-shake {
+            animation: heavy-shake 0.3s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes heavy-shake {
+            10%, 90% { transform: translate3d(-2px, 0, 0); }
+            20%, 80% { transform: translate3d(4px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
+            40%, 60% { transform: translate3d(6px, 0, 0); }
+        }
+
+        /* 結算畫面 */
+        #game-over-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+
+        #game-over-screen.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .game-over-box {
+            background: #3b2314;
+            border: 4px solid #fcd34d;
+            padding: 30px 50px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .restart-btn {
+            margin-top: 20px;
+            padding: 10px 25px;
+            background: #4ade80;
+            border: none;
+            border-radius: 5px;
+            color: black;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .restart-btn:hover { background: #22c55e; }
+    </style>
+</head>
+<body>
+
+    <div id="game-wrapper">
+        <div id="game-container">
+            
+            <div id="top-info-bar">
+                <div class="info-segment">🏫 <span>KGHS 福利社</span></div>
+                <div class="info-segment">⏳ 下課倒數: <span id="ui-timer" class="highlight-text">600</span> 秒</div>
+                <div class="info-segment">💰 今日營業額: <span id="ui-revenue" class="highlight-text">$0</span></div>
+            </div>
+
+            <div id="zone-cooler" class="shop-zone"></div>
+            <div id="zone-shelf" class="shop-zone"></div>
+
+            <div id="checkout-display-panel">
+                <div class="panel-title">SCANNING ITEMS...</div>
+                <div id="scan-queue-icons"></div>
+            </div>
+
+            <div id="control-board">
+                <button class="barcode-btn" data-item="🥛">
+                    <span>🥛</span>
+                    <span class="barcode-btn-label">奶茶 $20</span>
+                </button>
+                <button class="barcode-btn" data-item="🍞">
+                    <span>🍞</span>
+                    <span class="barcode-btn-label">蘋果麵包 $15</span>
+                </button>
+                <button class="barcode-btn" data-item="🍙">
+                    <span>🍙</span>
+                    <span class="barcode-btn-label">御飯糰 $30</span>
+                </button>
+            </div>
+
+            <div id="game-over-screen">
+                <div class="game-over-box">
+                    <h2 style="color: #fca5a5; font-size: 32px; margin-top:0;">🔔 上課鐘聲響了！</h2>
+                    <p style="font-size: 20px;">福利社今日營業額：<span id="final-revenue" style="color:#4ade80; font-weight:bold; font-size:28px;">$0</span></p>
+                    <button class="restart-btn" onclick="resetGame()">重新挑戰</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        /* --- JavaScript 遊戲核心程式碼 (全中文註解) --- */
+
+        // 遊戲核心組態與狀態
+        const CONFIG = {
+            totalTime: 600,         // 遊戲總時間 (秒)
+            spawnInterval: 3500,    // 新學生進入的時間間隔 (毫秒)
+            checkoutX: 520,         // 排隊排頭學生的 X 座標 (對齊圖片收銀台左方)
+            checkoutY: 450,         // 排隊學生的 Y 座標 (對齊圖片收銀櫃檯高度)
+            studentSpacing: 60      // 排隊時學生彼此的間距
+        };
+
+        let gameState = {
+            timer: CONFIG.totalTime,
+            revenue: 0,
+            studentsQueue: [],      // 目前正在排隊結帳的學生陣列
+            gameInterval: null,
+            spawnIntervalId: null
+        };
+
+        // 福利社精選商品資料庫
+        const itemDatabase = {
+            '🥛': { name: '阿薩姆奶茶', price: 20 },
+            '🍞': { name: '蘋果麵包', price: 15 },
+            '🍙': { name: '韓式御飯糰', price: 30 }
+        };
+
+        // 學生外觀表情包 (隨機挑選)
+        const studentAvatars = ['🧑‍🎓', '👩‍🎓', '👨‍🎓', '👩‍🏫', '🎒'];
+        // 隨機柔和彩色底色
+        const studentColors = ['#f87171', '#60a5fa', '#34d399', '#fbbf24', '#c084fc', '#f472b6'];
+
+        // DOM 元素快取
+        const elTimer = document.getElementById('ui-timer');
+        const elRevenue = document.getElementById('ui-revenue');
+        const elContainer = document.getElementById('game-container');
+        const elDisplayPanel = document.getElementById('checkout-display-panel');
+        const elScanIcons = document.getElementById('scan-queue-icons');
+        const elGameOver = document.getElementById('game-over-screen');
+        const elFinalRevenue = document.getElementById('final-revenue');
+
+        // 音效產生器 (使用 Web Audio API，免去外部音檔載入失敗的風險)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // 播放「嗶嗶」裝死聲 (刷錯時)
+        function playBuzzSound() {
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(120, audioCtx.currentTime); // 低頻沉悶聲
+                osc.frequency.setValueAtTime(100, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.25);
+            } catch(e) { console.log("音效撥放暫未支援"); }
+        }
+
+        // 播放「叮咚」清脆聲 (結帳成功時)
+        function playSuccessSound() {
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5 轉 A5 高音
+                osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.08);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } catch(e) { console.log("音效撥放暫未支援"); }
+        }
+
+        // 遊戲啟動初始化
+        window.addEventListener('DOMContentLoaded', () => {
+            initInputControls();
+            startGame();
+        });
+
+        // 監聽刷條碼實體按鈕
+        function initInputControls() {
+            const btns = document.querySelectorAll('.barcode-btn');
+            btns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const item = btn.getAttribute('data-item');
+                    handleCheckoutInput(item);
+                });
+            });
+        }
+
+        // 開始遊戲主要計時與排程
+        function startGame() {
+            gameState.gameInterval = setInterval(() => {
+                gameState.timer--;
+                elTimer.innerText = gameState.timer;
+                if (gameState.timer <= 0) {
+                    endGame();
+                }
+            }, 1000);
+
+            // 定時不斷湧入新學生
+            gameState.spawnIntervalId = setInterval(spawnStudent, CONFIG.spawnInterval);
+            
+            // 立即先生成一波學生增加開場感
+            spawnStudent();
+        }
+
+        // 第一階段：學生進場自行選購
+        function spawnStudent() {
+            if (gameState.timer <= 0) return;
+
+            // 建立學生實體 DOM
+            const student = document.createElement('div');
+            student.className = 'student';
+            student.style.backgroundColor = studentColors[Math.floor(Math.random() * studentColors.length)];
+            student.innerText = studentAvatars[Math.floor(Math.random() * studentAvatars.length)];
+            
+            // 隨機選購動線：從冷藏櫃還是麵包架附近晃入
+            const isGoingToCooler = Math.random() > 0.5;
+            // 初始在門口左側
+            student.style.left = '-60px';
+            student.style.top = '500px';
+
+            elContainer.appendChild(student);
+
+            // 頭頂對話框：挑選中
+            const bubble = document.createElement('div');
+            bubble.className = 'status-bubble';
+            bubble.innerText = '挑選中...';
+            student.appendChild(bubble);
+
+            // 走入福利社內部定位點
+            setTimeout(() => {
+                if (isGoingToCooler) {
+                    student.style.left = '120px';
+                    student.style.top = '280px'; // 靠近冷藏櫃下方
+                } else {
+                    student.style.left = '320px';
+                    student.style.top = '320px'; // 靠近海苔飯捲與微波爐區
+                }
+            }, 100);
+
+            // 第二階段：挑選 2-3 秒後，拿好食物前往櫃檯排隊
+            const shoppingTime = 2000 + Math.random() * 1000; // 2~3秒隨機
+            setTimeout(() => {
+                // 隨機挑選 2 到 3 個手裡拿的商品
+                const itemsCount = Math.floor(Math.random() * 2) + 2; 
+                const availableItems = Object.keys(itemDatabase);
+                student.shoppingCart = [];
+                for (let i = 0; i < itemsCount; i++) {
+                    student.shoppingCart.push(availableItems[Math.floor(Math.random() * availableItems.length)]);
+                }
+
+                bubble.innerText = '拿好了！🛒';
+                
+                // 前往收銀台排隊
+                moveStudentToCheckoutQueue(student);
+            }, shoppingTime);
+        }
+
+        // 將選購完的學生移往右側結帳櫃檯隊伍
+        function moveStudentToCheckoutQueue(student) {
+            gameState.studentsQueue.push(student);
+            
+            // 建立不耐煩暴躁計時器
+            student.patience = 100; // 耐心值
+            student.patienceTimer = setInterval(() => {
+                // 如果是在排隊中（且不是排在第一位正在結帳的人），耐心就會隨著隊伍過長而下滑
+                const myIndex = gameState.studentsQueue.indexOf(student);
+                if (myIndex > 0 && gameState.studentsQueue.length > 3) {
+                    student.patience -= 12; // 隊伍太長，瘋狂扣耐心
+                    
+                    // 耐心低於 50 變紅且身體開始暴躁抖動
+                    if (student.patience <= 50) {
+                        student.classList.add('angry-student');
+                        const bubble = student.querySelector('.status-bubble');
+                        if (bubble) bubble.innerText = '快點好嗎😡';
+                    }
+
+                    // 耐心扣光，憤而離去 (不付錢)
+                    if (student.patience <= 0) {
+                        studentAngryLeave(student);
+                    }
+                }
+            }, 1000);
+
+            arrangeQueuePositions();
+        }
+
+        // 重新編排所有排隊學生的實際畫面位置
+        function arrangeQueuePositions() {
+            gameState.studentsQueue.forEach((student, index) => {
+                // 排頭在最右邊收銀機前 (CONFIG.checkoutX)，後面的人依序往左排列
+                const targetX = CONFIG.checkoutX - (index * CONFIG.studentSpacing);
+                student.style.left = targetX + 'px';
+                student.style.top = CONFIG.checkoutY + 'px';
+            });
+
+            // 如果有人在排第一位，叫出收銀機掃描螢幕呈現商品
+            updateCheckoutDisplay();
+        }
+
+        // 更新中央收銀台螢幕顯示
+        function updateCheckoutDisplay() {
+            if (gameState.studentsQueue.length > 0) {
+                elDisplayPanel.style.display = 'block';
+                const currentStudent = gameState.studentsQueue[0];
+                
+                // 顯示排頭學生想買的所有東西
+                elScanIcons.innerHTML = '';
+                currentStudent.shoppingCart.forEach(itemEmoji => {
+                    const iconSpan = document.createElement('span');
+                    iconSpan.innerText = itemEmoji;
+                    elScanIcons.appendChild(iconSpan);
+                });
+
+                // 把排頭學生的對話框改成顯示目前商品需求
+                const bubble = currentStudent.querySelector('.status-bubble');
+                if (bubble) bubble.innerText = '結帳！';
+            } else {
+                elDisplayPanel.style.display = 'none';
+                elScanIcons.innerHTML = '';
+            }
+        }
+
+        // 第三階段：瘋狂收銀判斷處理
+        function handleCheckoutInput(clickedItem) {
+            if (gameState.studentsQueue.length === 0) return; // 沒人在排隊，點擊無效
+
+            const currentStudent = gameState.studentsQueue[0];
+            const targetItem = currentStudent.shoppingCart[0]; // 目前依序要刷的排頭商品
+
+            if (clickedItem === targetItem) {
+                // 刷對條碼了！從購物車中消除該商品
+                currentStudent.shoppingCart.shift();
+                
+                // 畫面上即時同步拿掉已刷完的標誌
+                if(elScanIcons.firstChild) {
+                    elScanIcons.removeChild(elScanIcons.firstChild);
+                }
+
+                // 如果該學生所有商品都刷完，完成交易！
+                if (currentStudent.shoppingCart.length === 0) {
+                    studentCheckoutSuccess(currentStudent);
+                }
+            } else {
+                // 商品拿錯或按錯了！
+                playBuzzSound(); // 發出嗶嗶裝死聲
+                
+                // 畫面劇烈震動一下
+                elContainer.classList.add('screen-shake');
+                setTimeout(() => elContainer.classList.remove('screen-shake'), 300);
+
+                // 核心處罰：扣 1 秒下課結帳時間
+                gameState.timer = Math.max(0, gameState.timer - 1);
+                elTimer.innerText = gameState.timer;
+            }
+        }
+
+        // 交易成功：學生留錢離開
+        function studentCheckoutSuccess(student) {
+            playSuccessSound();
+
+            // 計算整單總金額
+            let orderTotal = 0;
+            // 因為先前已經 shift 清空購物車，這裡以常態每位學生帶 2-3 個品項回算營收
+            orderTotal += 55; // 給予固定的基礎優渥大包組合費用增加回饋感
+            
+            gameState.revenue += orderTotal;
+            elRevenue.innerText = `$${gameState.revenue}`;
+
+            // 清除該學生的排隊耐心定時器
+            clearInterval(student.patienceTimer);
+
+            // 從陣列剔除並飛速移出畫面
+            gameState.studentsQueue.shift();
+            student.style.top = '680px'; // 往下走出福利社
+            student.style.opacity = '0';
+            setTimeout(() => student.remove(), 800);
+
+            // 重新排列後續隊伍
+            arrangeQueuePositions();
+        }
+
+        // 暴躁處罰：排太久憤而離去
+        function studentAngryLeave(student) {
+            const index = gameState.studentsQueue.indexOf(student);
+            if (index > -1) {
+                gameState.studentsQueue.splice(index, 1);
+            }
+            clearInterval(student.patienceTimer);
+
+            // 憤怒離開對話框
+            const bubble = student.querySelector('.status-bubble');
+            if (bubble) {
+                bubble.style.background = '#dc2626';
+                bubble.style.color = 'white';
+                bubble.innerText = '不買了啦！💢';
+            }
+
+            // 往左上角氣沖沖退場
+            student.style.left = '-100px';
+            student.style.top = '300px';
+            setTimeout(() => student.remove(), 1000);
+
+            // 重新編排隊伍
+            arrangeQueuePositions();
+        }
+
+        // 結束遊戲
+        function endGame() {
+            clearInterval(gameState.gameInterval);
+            clearInterval(gameState.spawnIntervalId);
+            
+            // 清除畫面上所有人
+            document.querySelectorAll('.student').forEach(s => {
+                clearInterval(s.patienceTimer);
+                s.remove();
+            });
+
+            // 跳出結算視窗
+            elFinalRevenue.innerText = `$${gameState.revenue}`;
+            elGameOver.classList.add('active');
+        }
+
+        // 重置遊戲
+        function resetGame() {
+            gameState.timer = CONFIG.totalTime;
+            gameState.revenue = 0;
+            gameState.studentsQueue = [];
+            elTimer.innerText = gameState.timer;
+            elRevenue.innerText = `$0`;
+            elGameOver.classList.remove('active');
+            startGame();
+        }
+    </script>
+</body>
+</html>
