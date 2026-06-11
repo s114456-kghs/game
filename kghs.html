@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KGHS 合作社小遊戲</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Zpix&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Zpix', 'Press Start 2P', monospace, sans-serif;
+            image-rendering: pixelated;
+        }
+        /* 像素風邊框 */
+        .pixel-border {
+            border: 4px solid #000;
+            box-shadow: 4px 4px 0px #888;
+        }
+        .pixel-btn {
+            border: 3px solid #000;
+            box-shadow: 2px 2px 0px #000;
+            transition: transform 0.05s;
+        }
+        .pixel-btn:active {
+            transform: translate(2px, 2px);
+            box-shadow: 0px 0px 0px #000;
+        }
+        /* 學生生氣或點錯時的抖動動畫 */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-4px); }
+            75% { transform: translateX(4px); }
+        }
+        .animate-shake {
+            animation: shake 0.2s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-200 min-h-screen flex flex-col items-center justify-center p-4 selection:bg-indigo-200">
+
+    <div class="w-full max-w-xl bg-white pixel-border flex flex-col relative overflow-hidden" style="height: 780px;">
+        
+        <div class="bg-blue-50 border-b-4 border-black p-3 text-center relative">
+            <h1 class="text-3xl font-bold text-blue-600 tracking-wider mb-2" style="text-shadow: 2px 2px 0px #bfdbfe;">
+                KGHS 合作社
+            </h1>
+            <div class="flex justify-between items-center px-4 bg-yellow-100 border-2 border-black p-1 text-sm font-bold">
+                <div class="flex items-center space-x-2">
+                    <div>剩餘時間: <span id="timer" class="text-red-600 text-lg">60</span> 秒</div>
+                    <button id="pause-btn" onclick="togglePause()" class="bg-white hover:bg-gray-100 text-black px-2 py-0.5 text-xs pixel-btn cursor-pointer font-bold ml-1 hidden">暫停</button>
+                </div>
+                <div class="text-xs text-orange-600">連擊: <span id="combo-ui" class="text-sm">0</span></div>
+                <div>本日營業額: <span id="revenue" class="text-green-600 text-lg">$0</span></div>
+            </div>
+        </div>
+
+        <div class="flex-grow relative bg-stone-50 p-4 flex flex-col justify-between">
+            
+            <div class="absolute top-2 right-2 w-16 h-20 bg-amber-800 border-4 border-black flex items-center justify-center text-xs text-white font-bold shadow-md">
+                入口
+            </div>
+
+            <div class="mt-16 space-y-4 w-3/4">
+                <div class="border-b-4 border-gray-400 bg-gray-300 h-8 flex items-center px-2 justify-around shadow-inner">
+                    <span class="text-xl">🌯</span><span class="text-xl">🍦</span><span class="text-xl">🧃</span><span class="text-xl">🥚</span>
+                </div>
+                <div class="border-b-4 border-gray-400 bg-gray-300 h-8 flex items-center px-2 justify-around shadow-inner">
+                    <span class="text-xl">🥟</span><span class="text-xl">🥖</span><span class="text-xl">🍢</span><span class="text-xl">🍱</span>
+                </div>
+            </div>
+
+            <div id="game-stage" class="absolute inset-0 pointer-events-none"></div>
+
+            <div class="w-full flex justify-between items-end border-t-4 border-dashed border-gray-300 pt-4 mt-auto">
+                <div class="bg-amber-600 border-4 border-black w-32 h-20 flex flex-col items-center justify-center text-white font-bold shadow-lg z-10">
+                    <div>收銀台</div>
+                    <div class="text-[11px] text-amber-200">💰 請依序結帳</div>
+                </div>
+                <div class="text-xs text-gray-400 italic mb-1">學生排隊區 ⮕</div>
+            </div>
+        </div>
+
+        <div class="bg-gray-100 border-t-4 border-black p-3">
+            <div class="text-xs font-bold text-gray-600 mb-2">▼ 點擊按鈕為排隊第一位學生結帳（雙重訂單需點選兩次）：</div>
+            <div id="checkout-panel" class="grid grid-cols-4 gap-2"></div>
+        </div>
+
+        <div id="pause-screen" class="hidden absolute inset-0 bg-black/70 flex flex-col items-center justify-center text-white z-40 p-6 text-center">
+            <h2 class="text-4xl font-bold text-blue-400 mb-6 tracking-widest" style="text-shadow: 2px 2px 0px #000;">遊戲暫停中</h2>
+            <button onclick="togglePause()" class="bg-green-600 hover:bg-green-700 text-white text-lg font-bold px-8 py-3 pixel-btn cursor-pointer">
+                繼續營業
+            </button>
+        </div>
+
+        <div id="game-over-screen" class="hidden absolute inset-0 bg-black/80 flex flex-col items-center justify-center text-white z-50 p-6 text-center">
+            <h2 class="text-4xl font-bold text-yellow-400 mb-4">本日營業結束！</h2>
+            <p class="text-xl mb-2">KGHS 合作社今日總營業額：</p>
+            <p id="final-revenue" class="text-5xl font-extrabold text-green-400 mb-4">$0</p>
+            <p id="final-combo" class="text-sm text-orange-300 mb-8">最高連擊數：0次</p>
+            <button onclick="startGame()" class="bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold px-8 py-3 pixel-btn cursor-pointer">
+                重新開店
+            </button>
+        </div>
+
+        <div id="start-screen" class="absolute inset-0 bg-white flex flex-col items-center justify-center z-50 p-6 text-center">
+            <h2 class="text-3xl font-bold text-blue-600 mb-2">KGHS 合作社經營賽</h2>
+            <div class="bg-gray-50 border-2 border-black p-4 text-left text-xs space-y-2 mb-6 max-w-sm leading-relaxed">
+                <p>1. 學生進店挑選商品後，會至收銀台排隊。</p>
+                <p>2. <span class="bg-yellow-200 px-1 font-bold">部分學生會一次想買<b>兩種商品</b>，頭頂氣泡會顯示兩個圖案！</b></span></p>
+                <p>3. 玩家必須依照<b>「從左到右」</b>的順序，連續點對兩個商品才能完成結帳！</p>
+                <p>4. 超過 10 秒變紅警戒，超過 20 秒氣跑離開。連續點對可累積 Combo 喔！</p>
+            </div>
+            <button onclick="startGame()" class="bg-green-600 hover:bg-green-700 text-white text-xl font-bold px-8 py-3 pixel-btn cursor-pointer">
+                開始營業 (60秒)
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const products = [
+            { id: 'riceball', name: '飯卷', price: 50, icons: ['🌯'] },
+            { id: 'icecream', name: '冰品', price: 30, icons: ['🍦', '🍨', '🍧'] },
+            { id: 'drink', name: '飲料', price: 30, icons: ['🧃', '🥤'] },
+            { id: 'egg', name: '茶葉蛋', price: 11, icons: ['🥚'] },
+            { id: 'dumpling', name: '水餃', price: 50, icons: ['🥟'] },
+            { id: 'bread', name: '麵包', price: 13, icons: ['🥖', '🥐', '🥯', '🍞'] },
+            { id: 'oden', name: '關東煮', price: 15, icons: ['🍢'] },
+            { id: 'bento', name: '便當', price: 80, icons: ['🍱'] },
+            { id: 'cookie', name: '餅乾', price: 32, icons: ['🍪'] }
+        ];
+
+        const studentStyles = [
+            { emoji: '👩‍🎓', bg: 'bg-pink-400' },
+            { emoji: '👩🏻‍🏫', bg: 'bg-purple-400' },
+            { emoji: '👩', bg: 'bg-cyan-400' },
+            { emoji: '🙎‍', bg: 'bg-yellow-400' },
+            { emoji: '👧', bg: 'bg-teal-400' }
+        ];
+
+        let gameTimer = null;
+        let spawnTimer = null;
+        let timeLeft = 60;
+        let revenue = 0;
+        let combo = 0;
+        let maxCombo = 0;
+        let studentsQueue = []; 
+        let audioCtx = null; 
+        let isPaused = false; 
+        let lastSpawnTime = 0; 
+        let nextSpawnInterval = 3000; 
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSound(type) {
+            if (!audioCtx || isPaused) return; 
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'half-ding') { 
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); 
+                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.15);
+            } else if (type === 'ding') { 
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); 
+                osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.08); 
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'angry') { 
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(80, audioCtx.currentTime + 0.4);
+                gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.4);
+            }
+        }
+
+        function createPanel() {
+            const panel = document.getElementById('checkout-panel');
+            panel.innerHTML = '';
+            products.forEach(p => {
+                const btn = document.createElement('button');
+                btn.className = "bg-white hover:bg-gray-50 text-black p-2 pixel-btn flex flex-col items-center justify-center text-xs font-bold cursor-pointer";
+                btn.innerHTML = `<span class="text-xl mb-1">${p.icons[0]}</span><span>${p.name}</span><span class="text-gray-500 text-[10px]">$${p.price}</span>`;
+                btn.onclick = () => handleCheckout(p.id);
+                panel.appendChild(btn);
+            });
+        }
+
+        function startGame() {
+            initAudio();
+            timeLeft = 60;
+            revenue = 0;
+            combo = 0;
+            maxCombo = 0;
+            studentsQueue = [];
+            isPaused = false;
+            document.getElementById('timer').innerText = timeLeft;
+            document.getElementById('revenue').innerText = `$${revenue}`;
+            document.getElementById('combo-ui').innerText = combo;
+            document.getElementById('game-stage').innerHTML = '';
+            
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            document.getElementById('pause-screen').classList.add('hidden');
+            document.getElementById('pause-btn').classList.remove('hidden');
+
+            clearInterval(gameTimer);
+            gameTimer = setInterval(() => {
+                if (isPaused) return; 
+                timeLeft--;
+                document.getElementById('timer').innerText = timeLeft;
+                if (timeLeft <= 0) endGame();
+            }, 1000);
+
+            clearInterval(spawnTimer);
+            lastSpawnTime = Date.now();
+            nextSpawnInterval = 2000 + Math.random() * 2000;
+            spawnWithRandomInterval();
+            spawnStudent();
+        }
+
+        function togglePause() {
+            if (timeLeft <= 0) return;
+            
+            isPaused = !isPaused;
+            const pauseScreen = document.getElementById('pause-screen');
+            const pauseBtn = document.getElementById('pause-btn');
+
+            if (isPaused) {
+                pauseScreen.classList.remove('hidden');
+                pauseBtn.innerText = "繼續";
+                clearTimeout(spawnTimer);
+                nextSpawnInterval = Math.max(500, nextSpawnInterval - (Date.now() - lastSpawnTime));
+            } else {
+                pauseScreen.classList.add('hidden');
+                pauseBtn.innerText = "暫停";
+                lastSpawnTime = Date.now();
+                spawnTimer = setTimeout(() => {
+                    spawnStudent();
+                    nextSpawnInterval = 2000 + Math.random() * 2000;
+                    spawnWithRandomInterval();
+                }, nextSpawnInterval);
+            }
+        }
+
+        function spawnWithRandomInterval() {
+            if (timeLeft <= 0 || isPaused) return;
+            nextSpawnInterval = 2000 + Math.random() * 2000; 
+            spawnTimer = setTimeout(() => {
+                if (!isPaused) {
+                    spawnStudent();
+                    lastSpawnTime = Date.now();
+                    spawnWithRandomInterval();
+                }
+            }, nextSpawnInterval);
+        }
+
+        function spawnStudent() {
+            if (timeLeft <= 4 || isPaused) return; 
+
+            const stage = document.getElementById('game-stage');
+            const studentId = 'student_' + Date.now() + '_' + Math.floor(Math.random()*1000);
+            const style = studentStyles[Math.floor(Math.random() * studentStyles.length)];
+
+            const isDoubleOrder = Math.random() < 0.45;
+            let orderItems = [];
+
+            const p1 = products[Math.floor(Math.random() * products.length)];
+            orderItems.push({ productId: p1.id, icon: p1.icons[Math.floor(Math.random() * p1.icons.length)], price: p1.price });
+
+            if (isDoubleOrder) {
+                const p2 = products[Math.floor(Math.random() * products.length)];
+                orderItems.push({ productId: p2.id, icon: p2.icons[Math.floor(Math.random() * p2.icons.length)], price: p2.price });
+            }
+
+            const studentEl = document.createElement('div');
+            studentEl.id = studentId;
+            studentEl.className = "absolute transition-all duration-500 flex flex-col items-center pointer-events-auto z-20";
+            studentEl.style.top = "50px";
+            studentEl.style.right = "20px";
+            
+            const iconsHTML = orderItems.map((item, idx) => `
+                <span id="item-${idx}" class="text-lg mx-0.5 px-0.5 rounded transition-all duration-200">${item.icon}</span>
+            `).join(orderItems.length > 1 ? '<span class="text-gray-400 text-xs">+</span>' : '');
+
+            studentEl.innerHTML = `
+                <div class="bubble hidden mb-1 bg-white border-2 border-black px-2 py-1 rounded shadow-md text-center relative animate-bounce flex flex-col items-center min-w-[40px]">
+                    <div class="flex items-center justify-center">${iconsHTML}</div>
+                    <div class="w-10 h-1 bg-gray-200 mt-1 border border-black overflow-hidden">
+                        <div class="progress-bar h-full bg-green-500 w-full transition-all duration-100"></div>
+                    </div>
+                </div>
+                <div class="w-8 h-8 rounded-full ${style.bg} border-2 border-black flex items-center justify-center text-lg shadow-sm">
+                    ${style.emoji}
+                </div>
+            `;
+
+            stage.appendChild(studentEl);
+
+            setTimeout(() => {
+                studentEl.style.right = "auto";
+                studentEl.style.left = (40 + Math.random() * 120) + "px";
+                studentEl.style.top = (70 + Math.random() * 60) + "px";
+
+                const pickTime = 2000 + Math.random() * 1000; 
+                setTimeout(() => {
+                    goToCashierQueue(studentEl, orderItems);
+                }, pickTime);
+            }, 100);
+        }
+
+        function goToCashierQueue(studentEl, orderItems) {
+            const studentData = {
+                id: studentEl.id,
+                orders: orderItems, 
+                currentIdx: 0,      
+                el: studentEl,
+                waitTime: 0
+            };
+
+            studentsQueue.push(studentData);
+            updateQueuePositions();
+
+            const bubble = studentEl.querySelector('.bubble');
+            bubble.classList.remove('hidden');
+
+            studentData.interval = setInterval(() => {
+                if (isPaused) return; 
+                
+                studentData.waitTime++;
+                
+                const progressBar = studentEl.querySelector('.progress-bar');
+                const percent = Math.max(0, 100 - (studentData.waitTime / 20) * 100);
+                if(progressBar) progressBar.style.width = `${percent}%`;
+
+                if (studentData.waitTime >= 10 && studentData.waitTime < 20) {
+                    bubble.classList.add('bg-red-100', 'border-red-600', 'animate-shake');
+                    if(progressBar) {
+                        progressBar.classList.remove('bg-green-500', 'bg-yellow-500');
+                        progressBar.classList.add('bg-red-500');
+                    }
+                } else if (studentData.waitTime >= 5 && studentData.waitTime < 10) {
+                    if(progressBar) {
+                        progressBar.classList.remove('bg-green-500');
+                        progressBar.classList.add('bg-yellow-500');
+                    }
+                }
+                
+                if (studentData.waitTime >= 20) {
+                    clearInterval(studentData.interval);
+                    playSound('angry');
+                    
+                    combo = 0;
+                    document.getElementById('combo-ui').innerText = combo;
+
+                    studentsQueue = studentsQueue.filter(s => s.id !== studentData.id);
+                    
+                    bubble.innerHTML = `<span class="text-red-600 font-bold text-sm">生氣💢</span>`;
+                    studentEl.style.left = "-100px"; 
+                    
+                    setTimeout(() => { studentEl.remove(); }, 600);
+                    updateQueuePositions();
+                }
+            }, 1000);
+        }
+
+        function updateQueuePositions() {
+            studentsQueue.forEach((student, index) => {
+                // 【優化】將排隊與結帳區域移至最右下角 (440px)，第一位結帳學生 (index為0) 剛好落在收銀台右側 (170px)
+                // 後續學生以 80px 的舒適間距往右延伸排隊，與商品架完全錯開
+                student.el.style.top = "560px";
+                student.el.style.left = (170 + index * 80) + "px";
+            });
+        }
+
+        function handleCheckout(clickedProductId) {
+            if (studentsQueue.length === 0 || isPaused) return; 
+
+            const currentStudent = studentsQueue[0];
+            const targetOrder = currentStudent.orders[currentStudent.currentIdx];
+
+            if (targetOrder.productId === clickedProductId) {
+                currentStudent.currentIdx++;
+
+                if (currentStudent.currentIdx < currentStudent.orders.length) {
+                    playSound('half-ding');
+                    
+                    const matchedItemEl = currentStudent.el.querySelector(`#item-${currentStudent.currentIdx - 1}`);
+                    if(matchedItemEl) {
+                        matchedItemEl.classList.add('opacity-20', 'line-through');
+                    }
+                } else {
+                    clearInterval(currentStudent.interval);
+                    playSound('ding');
+
+                    combo++;
+                    if (combo > maxCombo) maxCombo = combo;
+                    document.getElementById('combo-ui').innerText = combo;
+
+                    let totalPrice = 0;
+                    currentStudent.orders.forEach(o => totalPrice += o.price);
+                    
+                    const multiOrderBonus = currentStudent.orders.length > 1 ? 10 : 0;
+                    const comboBonus = combo >= 5 ? 5 : 0;
+                    const finalEarnings = totalPrice + multiOrderBonus + comboBonus;
+                    
+                    revenue += finalEarnings;
+                    document.getElementById('revenue').innerText = `$${revenue}`;
+
+                    const bubble = currentStudent.el.querySelector('.bubble');
+                    bubble.innerHTML = `<span class="text-yellow-600 font-bold text-xs">✨+$${finalEarnings}</span>`;
+                    
+                    currentStudent.el.style.top = "520px"; 
+                    currentStudent.el.style.opacity = "0";
+                    
+                    studentsQueue.shift();
+                    updateQueuePositions();
+
+                    setTimeout(() => { currentStudent.el.remove(); }, 500);
+                }
+            } else {
+                combo = 0;
+                document.getElementById('combo-ui').innerText = combo;
+
+                currentStudent.currentIdx = 0;
+                currentStudent.orders.forEach((_, idx) => {
+                    const itemEl = currentStudent.el.querySelector(`#item-${idx}`);
+                    if (itemEl) {
+                        itemEl.classList.remove('opacity-20', 'line-through');
+                    }
+                });
+
+                const bubble = currentStudent.el.querySelector('.bubble');
+                bubble.classList.add('animate-shake');
+                setTimeout(() => {
+                    if (currentStudent.waitTime < 10) {
+                        bubble.classList.remove('animate-shake');
+                    }
+                }, 300);
+            }
+        }
+
+        function endGame() {
+            clearInterval(gameTimer);
+            clearTimeout(spawnTimer);
+            studentsQueue.forEach(s => clearInterval(s.interval));
+            document.getElementById('pause-btn').classList.add('hidden');
+
+            document.getElementById('final-revenue').innerText = `$${revenue}`;
+            document.getElementById('final-combo').innerText = `最高連擊數：${maxCombo} 次`;
+            document.getElementById('game-over-screen').classList.remove('hidden');
+        }
+
+        window.onload = () => {
+            createPanel();
+        };
+    </script>
+</body>
+</html>
